@@ -14,6 +14,18 @@ if exist "%~dp0server\server.js" (
     cd /d "%~dp0"
 )
 
+echo Checking package installation...
+node -e "try { require('express'); require('ws'); require('bcryptjs'); require('multer'); require('uuid'); } catch (e) { process.exit(1); }" >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo.
+    echo [WARNING] Dependencies missing or incomplete.
+    echo Running "npm install" automatically...
+    echo.
+    call npm install
+) else (
+    echo [OK] All packages are successfully installed.
+)
+
 :: Set Node flags for node:sqlite
 set NODE_OPTIONS=--experimental-sqlite
 
