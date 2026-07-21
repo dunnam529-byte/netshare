@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Regnis — Local Network Hub</title>
+    <meta name="description" content="Regnis V2: Private local-network chat, file sharing, and file pool system.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══════════════════ OVERLAYS ═══════════════════ -->
+
+<!-- Join / Login Screen -->
+<div id="join-overlay" class="overlay active">
+    <div class="overlay-bg-fx">
+        <div class="glow-orb orb1"></div>
+        <div class="glow-orb orb2"></div>
+        <div class="grid-lines"></div>
+    </div>
+    <div class="join-card glass-card">
+        <div class="join-logo">
+            <div class="logo-icon">⬡</div>
+            <h1 class="brand-name">REGNIS</h1>
+            <p class="brand-sub">LOCAL NETWORK HUB V2</p>
+        </div>
+
+        <!-- Auth Tabs -->
+        <div class="auth-tabs">
+            <button class="auth-tab-btn active" id="tab-login-btn" onclick="switchAuthTab('login')">LOGIN</button>
+            <button class="auth-tab-btn" id="tab-register-btn" onclick="switchAuthTab('register')">REGISTER</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form-area" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label class="form-label">DISPLAY NAME</label>
+                <input type="text" id="login-nickname" class="form-input" placeholder="Enter your display name" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label class="form-label">PASSWORD</label>
+                <input type="password" id="login-password" class="form-input" placeholder="Enter password" required autocomplete="current-password">
+                <div class="forgot-pass-note">Forgot password? Contact your Network Administrator for a reset.</div>
+            </div>
+            <div id="login-error" class="form-error hidden"></div>
+            <button type="submit" id="login-submit-btn" class="btn btn-primary btn-full">
+                <span class="btn-glow"></span>
+                <span>LOG IN</span>
+            </button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="register-form-area" class="hidden" onsubmit="handleRegister(event)">
+            <div class="form-group">
+                <label class="form-label">CHOOSE DISPLAY NAME</label>
+                <input type="text" id="register-nickname" class="form-input" placeholder="e.g. Alex, Jordan, Sam" maxlength="30" required autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label">CHOOSE PASSWORD</label>
+                <input type="password" id="register-password" class="form-input" placeholder="Minimum 4 characters" minlength="4" required autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">PROFILE PHOTO <span class="optional-label">(optional)</span></label>
+                <div class="profile-upload-area" id="profile-upload-zone" onclick="document.getElementById('profile-input-join').click()">
+                    <div id="profile-preview-join" class="profile-preview-placeholder">
+                        <span class="upload-icon">📷</span>
+                        <span>Click to choose photo</span>
+                    </div>
+                    <input type="file" id="profile-input-join" accept="image/*" class="hidden" onchange="handleJoinProfilePreview(this)">
+                </div>
+            </div>
+            <div id="register-error" class="form-error hidden"></div>
+            <button type="submit" id="register-submit-btn" class="btn btn-primary btn-full">
+                <span class="btn-glow"></span>
+                <span>CREATE ACCOUNT & JOIN</span>
+            </button>
+        </form>
+
+        <div class="join-status">
+            <span class="status-dot online"></span>
+            <span id="join-host-ip">Connecting to host...</span>
+        </div>
+
+        <div id="join-loading" class="join-loading hidden">
+            <div class="spinner"></div>
+            <span id="join-loading-text">Authenticating...</span>
+        </div>
+    </div>
+</div>
+
+<!-- Pending Approval Screen -->
+<div id="pending-overlay" class="overlay hidden">
+    <div class="overlay-bg-fx">
+        <div class="glow-orb orb2"></div>
+    </div>
+    <div class="join-card glass-card text-center">
+        <div class="pending-icon">⏳</div>
+        <h2 class="overlay-title">Access Pending</h2>
+        <p class="overlay-desc">Your request to join the network has been sent to the administrator. Please wait for approval.</p>
+        <div class="spinner" style="margin: 24px auto;"></div>
+        <p class="text-muted" style="font-size:0.8rem;">This screen will automatically update when approved.</p>
+    </div>
+</div>
+
+<!-- Blocked / Kicked Screen -->
+<div id="blocked-overlay" class="overlay hidden">
+    <div class="join-card glass-card text-center">
+        <div class="blocked-icon">🚫</div>
+        <h2 class="overlay-title text-danger" id="blocked-title">Connection Blocked</h2>
+        <p class="overlay-desc" id="blocked-desc">Your connection was terminated by the administrator.</p>
+        <button class="btn btn-outline" style="margin-top:20px;" onclick="location.reload()">Return to Login</button>
+    </div>
+</div>
+
+<!-- ═══════════════════ MAIN APP ═══════════════════ -->
+<div id="app" class="hidden">
+
+    <!-- ADMIN ANNOUNCEMENT BANNER -->
+    <div id="announcement-banner" class="announcement-banner hidden">
+        <span class="announcement-icon">📢</span>
+        <span id="announcement-text" class="announcement-text"></span>
+        <button class="announcement-close" onclick="closeAnnouncement()">✕</button>
+    </div>
+
+    <!-- HEADER -->
+    <header class="app-header glass-header">
+        <div class="header-brand">
+            <span class="brand-icon">⬡</span>
+            <span class="brand-text">REGNIS</span>
+        </div>
+
+        <nav class="header-nav">
+            <button class="nav-btn active" id="nav-chat" onclick="showView('chat')">
+                <span class="nav-icon">💬</span> Chat
+            </button>
+            <button class="nav-btn" id="nav-pool" onclick="showView('pool')">
+                <span class="nav-icon">🗂️</span> File Pool
+            </button>
+            <button class="nav-btn" id="nav-users" onclick="showView('users')">
+                <span class="nav-icon">👥</span> Users
+            </button>
+            <button class="nav-btn admin-only hidden" id="nav-admin" onclick="openAdminPanel()">
+                <span class="nav-icon">⚙️</span> Admin
+            </button>
+        </nav>
+
+        <div class="header-user-area">
+            <button class="header-action-icon" title="Search Messages & Files" onclick="openSearchModal()">
+                🔍
+            </button>
+            <div class="notification-bell" id="notif-bell" title="Notifications" onclick="toggleNotificationDrawer()">
+                🔔<span id="notif-badge" class="notif-badge hidden">0</span>
+            </div>
+            <div class="user-profile-btn" id="profile-btn" onclick="openProfileMenu()">
+                <div class="avatar-sm" id="header-avatar">
+                    <span id="header-avatar-text">?</span>
+                </div>
+                <span id="header-username">Guest</span>
+                <span class="chevron">▾</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- PROFILE DROPDOWN -->
+    <div id="profile-dropdown" class="dropdown glass-card hidden">
+        <div class="dropdown-header">
+            <div class="avatar-md" id="dropdown-avatar"><span id="dropdown-avatar-text">?</span></div>
+            <div>
+                <div class="fw-600" id="dropdown-name">Guest</div>
+                <div class="text-muted text-sm">Online</div>
+            </div>
+        </div>
+        <hr class="divider">
+        <button class="dropdown-item" onclick="triggerProfilePhotoUpload()">📷 Change Photo</button>
+        <button class="dropdown-item text-danger" onclick="leaveNetwork()">🚪 Logout</button>
+    </div>
+
+    <!-- NOTIFICATION DRAWER -->
+    <div id="notification-drawer" class="dropdown glass-card notif-drawer hidden">
+        <div class="dropdown-header" style="justify-content:space-between;">
+            <span class="fw-600">Notifications</span>
+            <button class="text-xs text-muted icon-btn-sm" onclick="clearNotifications()">Clear All</button>
+        </div>
+        <hr class="divider">
+        <div id="notif-perm-banner" class="notif-perm-banner hidden" style="padding: 8px; margin: 6px; background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.3); border-radius: 6px; text-align: center;">
+            <div style="font-size:0.75rem; margin-bottom:6px; color: var(--text-secondary);">Enable browser desktop popups</div>
+            <button class="btn btn-primary" style="font-size:0.72rem; padding: 4px 10px; width: 100%;" onclick="requestNotificationPermissionUser()">Enable Notifications 🔔</button>
+        </div>
+        <div id="notifications-list" class="notifications-list">
+            <div class="text-muted text-sm text-center" style="padding:12px;">No new notifications</div>
+        </div>
+    </div>
+
+    <!-- VIEWS CONTAINER -->
+    <div class="views-container">
+
+        <!-- ═══ CHAT VIEW ═══ -->
+        <div id="view-chat" class="view view-chat active-view">
+
+            <!-- LEFT SIDEBAR -->
+            <aside class="sidebar glass-sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span>CHANNELS</span>
+                        <button class="icon-btn-sm" id="create-group-btn" title="Create Group" onclick="openCreateGroupModal()">＋</button>
+                    </div>
+                    <!-- Global Channel -->
+                    <div class="channel-item active" id="global-channel-item" onclick="selectChannel('global','global','🌐 Global Chat')">
+                        <div class="channel-icon-wrap"><span class="channel-prefix">#</span></div>
+                        <div class="channel-info"><span class="channel-name">Global Chat</span></div>
+                        <span class="unread-badge hidden" id="unread-global"></span>
+                    </div>
+                    <!-- Private Groups -->
+                    <div id="groups-list"></div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span>DIRECT MESSAGES</span>
+                    </div>
+                    <div class="dm-search-wrap" style="padding:0 8px 6px;">
+                        <input type="text" id="dm-search-input" class="dm-search-input" placeholder="🔍 Search user..." oninput="renderDMList()" autocomplete="off">
+                    </div>
+                    <div id="dm-list"></div>
+                </div>
+            </aside>
+
+            <!-- CENTER: CHAT AREA -->
+            <main class="chat-main" id="chat-drop-zone">
+                <div class="drag-drop-overlay hidden" id="drag-drop-overlay">
+                    <div class="drag-drop-box">
+                        <span class="drag-drop-icon">📁</span>
+                        <span>Drop file here to attach to chat</span>
+                    </div>
+                </div>
+
+                <div class="chat-header-bar glass-bar">
+                    <div class="chat-title-area">
+                        <span class="chat-prefix" id="chat-prefix">#</span>
+                        <span class="chat-title-name" id="chat-title">Global Chat</span>
+                        <button class="icon-btn-sm hidden" id="group-settings-btn" title="Group Settings" onclick="openGroupManagementModal()">⚙️</button>
+                    </div>
+                    <div class="chat-header-actions">
+                        <span id="chat-disabled-badge" class="disabled-badge hidden">CHAT DISABLED</span>
+                    </div>
+                </div>
+
+                <div class="chat-main-layout">
+                    <div class="chat-messages-col">
+                        <div class="messages-area" id="messages-area">
+                            <div class="messages-empty" id="messages-empty">
+                                <div class="empty-icon">💬</div>
+                                <p>No messages yet. Start the conversation!</p>
+                            </div>
+                        </div>
+
+                        <!-- Typing indicator banner -->
+                        <div id="typing-indicator" class="typing-indicator hidden">
+                            <div class="typing-dots"><span></span><span></span><span></span></div>
+                            <span id="typing-text">Someone is typing...</span>
+                        </div>
+
+                        <div class="chat-footer">
+                            <div id="upload-progress-wrap" class="upload-progress hidden">
+                                <div class="progress-info-row">
+                                    <span id="upload-fname" class="text-sm text-muted">Uploading...</span>
+                                    <span id="upload-pct" class="text-sm">0%</span>
+                                </div>
+                                <div class="progress-track">
+                                    <div class="progress-fill" id="upload-fill"></div>
+                                </div>
+                            </div>
+                            <div id="mention-autocomplete" class="mention-autocomplete hidden"></div>
+                            <div class="input-row">
+                                <button class="attach-btn" id="attach-btn" title="Attach File" onclick="openChatFileUploadDialog()">📎</button>
+                                <input type="text" id="msg-input" class="msg-input" placeholder="Type a message... (@username to mention)" maxlength="1000" autocomplete="off" oninput="handleMsgInputMention(event)" onkeydown="handleMsgInputKeyDown(event)">
+                                <button class="send-btn" id="send-btn" onclick="sendMessage()">SEND</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="global-active-users-panel" class="global-active-users-panel hidden">
+                        <div class="active-users-header">ACTIVE IN GLOBAL</div>
+                        <div id="online-users-bar" class="online-users-bar-vertical"></div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- RIGHT: FILES PANEL -->
+            <aside class="files-panel glass-sidebar">
+                <div class="panel-header">
+                    <span class="panel-title">SHARED FILES</span>
+                    <span id="files-disabled-badge" class="disabled-badge hidden">DISABLED</span>
+                </div>
+                <div class="file-tabs">
+                    <button class="file-tab-btn active" data-tab="photo" onclick="selectFileTab(this, 'photo')">📷 Photos</button>
+                    <button class="file-tab-btn" data-tab="video" onclick="selectFileTab(this, 'video')">🎬 Video</button>
+                    <button class="file-tab-btn" data-tab="other" onclick="selectFileTab(this, 'other')">📎 Other</button>
+                </div>
+                <div class="files-scroll" id="chat-files-container">
+                    <div class="files-empty">No files shared yet.</div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- ═══ FILE POOL VIEW ═══ -->
+        <div id="view-pool" class="view view-pool hidden">
+            <div class="pool-header-bar glass-bar">
+                <div>
+                    <h2 class="view-title">🗂️ Network File Pool</h2>
+                    <p class="view-sub">Shared network drive — upload, download & search files</p>
+                </div>
+                <button class="btn btn-primary" onclick="openPoolUploadModalDialog()">
+                    ＋ Upload to Pool
+                </button>
+            </div>
+
+            <!-- Pool Toolbar (Search, Sort, Category Filter) -->
+            <div class="pool-toolbar glass-bar">
+                <div class="pool-search-wrap">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="pool-search-input" class="form-input pool-search-input" placeholder="Search pool files..." oninput="debouncePoolSearch()">
+                </div>
+                <div class="pool-filter-group">
+                    <select id="pool-sort-select" class="form-input pool-select" onchange="renderPool()">
+                        <option value="recent">Newest First</option>
+                        <option value="name">Sort by Name</option>
+                        <option value="size">Sort by Size</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="file-tabs pool-tabs">
+                <button class="file-tab-btn active" data-tab="all" onclick="selectPoolTab(this, 'all')">🌐 All</button>
+                <button class="file-tab-btn" data-tab="photo" onclick="selectPoolTab(this, 'photo')">📷 Photos</button>
+                <button class="file-tab-btn" data-tab="video" onclick="selectPoolTab(this, 'video')">🎬 Videos</button>
+                <button class="file-tab-btn" data-tab="other" onclick="selectPoolTab(this, 'other')">📎 Other</button>
+            </div>
+
+            <div class="pool-grid" id="pool-container">
+                <div class="files-empty">No files in the pool yet.</div>
+            </div>
+        </div>
+
+        <!-- ═══ USERS VIEW ═══ -->
+        <div id="view-users" class="view view-users hidden">
+            <div class="pool-header-bar glass-bar">
+                <div>
+                    <h2 class="view-title">👥 Network Directory</h2>
+                    <p class="view-sub">Registered users on this local network</p>
+                </div>
+                <div class="user-filter-tabs" style="display:flex;align-items:center;gap:10px;">
+                    <input type="text" id="users-search-input" class="form-input" style="width:200px;font-size:0.8rem;padding:6px 12px;" placeholder="🔍 Search users..." oninput="renderUsersGrid()">
+                    <button class="filter-btn active" id="filter-all" onclick="filterUsers('all')">All Users</button>
+                    <button class="filter-btn" id="filter-online" onclick="filterUsers('online')">Online Now</button>
+                </div>
+            </div>
+            <div class="users-grid" id="users-grid"></div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Hidden inputs -->
+<input type="file" id="file-input-chat" class="hidden" accept="*/*">
+<input type="file" id="file-input-pool" class="hidden" accept="*/*">
+<input type="file" id="file-input-profile" accept="image/*" class="hidden">
+
+<!-- ═══════════════════ MODALS ═══════════════════ -->
+
+<!-- Emoji Reaction Picker Popup -->
+<div id="reaction-picker" class="reaction-picker glass-card hidden">
+    <button class="reaction-emoji" onclick="addReaction('👍')">👍</button>
+    <button class="reaction-emoji" onclick="addReaction('❤️')">❤️</button>
+    <button class="reaction-emoji" onclick="addReaction('😂')">😂</button>
+    <button class="reaction-emoji" onclick="addReaction('😮')">😮</button>
+    <button class="reaction-emoji" onclick="addReaction('😢')">😢</button>
+    <button class="reaction-emoji" onclick="addReaction('🔥')">🔥</button>
+</div>
+
+<!-- Search Modal -->
+<div id="modal-search" class="modal-overlay hidden" onclick="closeModalOverlay(event, 'modal-search')">
+    <div class="modal glass-card modal-wide">
+        <div class="modal-header">
+            <h3>🔍 Search Messages & Files</h3>
+            <button class="modal-close" onclick="closeModal('modal-search')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <input type="text" id="global-search-input" class="form-input" placeholder="Type keywords to search..." oninput="debounceGlobalSearch()">
+            </div>
+            <div id="search-results-list" class="search-results-list">
+                <div class="text-muted text-center" style="padding:20px;">Type a keyword to begin search</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload File Preview & Rename Modal -->
+<div id="modal-upload-preview" class="modal-overlay hidden" onclick="closeModalOverlay(event, 'modal-upload-preview')">
+    <div class="modal glass-card">
+        <div class="modal-header">
+            <h3 id="upload-modal-title">📎 File Share</h3>
+            <button class="modal-close" onclick="closeModal('modal-upload-preview')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div id="upload-file-preview-box" class="pool-upload-preview"></div>
+            <div class="form-group" style="margin-top:16px;">
+                <label class="form-label">FILE DISPLAY NAME</label>
+                <input type="text" id="upload-custom-name" class="form-input" placeholder="Rename file (optional)">
+            </div>
+            <div class="form-group hidden" id="pool-pass-group">
+                <label class="form-label">PASSWORD PROTECTION <span class="optional-label">(optional)</span></label>
+                <input type="password" id="pool-password-input" class="form-input" placeholder="Leave blank for public access">
+            </div>
+            <div id="pool-modal-progress-wrap" class="upload-progress hidden" style="margin-top:12px;">
+                <div class="progress-info-row">
+                    <span class="text-sm text-muted">Uploading to server...</span>
+                    <span id="pool-modal-pct" class="text-sm">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill" id="pool-modal-fill"></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-upload-preview')">Cancel</button>
+            <button class="btn btn-primary" id="upload-confirm-btn" onclick="submitFileUpload()">Upload & Share</button>
+        </div>
+    </div>
+</div>
+
+<!-- Comments Modal -->
+<div id="modal-comments" class="modal-overlay hidden" onclick="closeModalOverlay(event, 'modal-comments')">
+    <div class="modal glass-card">
+        <div class="modal-header">
+            <h3>💬 Comments</h3>
+            <button class="modal-close" onclick="closeModal('modal-comments')">✕</button>
+        </div>
+        <div class="modal-body" id="comments-list">
+            <div class="text-muted text-center">Loading comments...</div>
+        </div>
+        <div class="modal-footer">
+            <input type="text" id="comment-input" class="form-input" placeholder="Add a comment..." maxlength="500">
+            <button class="btn btn-primary" id="comment-submit-btn">Post</button>
+        </div>
+    </div>
+</div>
+
+<!-- Create Group Modal -->
+<div id="modal-create-group" class="modal-overlay hidden" onclick="closeModalOverlay(event, 'modal-create-group')">
+    <div class="modal glass-card">
+        <div class="modal-header">
+            <h3>➕ Create Private Group</h3>
+            <button class="modal-close" onclick="closeModal('modal-create-group')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">GROUP NAME</label>
+                <input type="text" id="group-name-input" class="form-input" placeholder="e.g. Team Alpha, Project X" maxlength="50">
+            </div>
+            <div class="form-group">
+                <label class="form-label">SELECT MEMBERS</label>
+                <input type="text" id="member-search" class="form-input" placeholder="Filter users..." oninput="filterMemberSearch()">
+                <div class="member-list" id="member-list"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">SELECTED</label>
+                <div class="selected-members" id="selected-members"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-create-group')">Cancel</button>
+            <button class="btn btn-primary" onclick="createGroup()">Create Group</button>
+        </div>
+    </div>
+</div>
+
+<!-- Group Management Modal -->
+<div id="modal-group-mgmt" class="modal-overlay hidden" onclick="closeModalOverlay(event, 'modal-group-mgmt')">
+    <div class="modal glass-card">
+        <div class="modal-header">
+            <h3>⚙️ Group Settings</h3>
+            <button class="modal-close" onclick="closeModal('modal-group-mgmt')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">RENAME GROUP</label>
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="mgmt-group-name" class="form-input">
+                    <button class="btn btn-outline" onclick="updateGroupName()">Save</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">GROUP MEMBERS</label>
+                <div id="mgmt-members-list" class="member-list" style="max-height:140px;"></div>
+            </div>
+            <hr class="divider">
+            <div style="display:flex;gap:8px;justify-content:space-between;margin-top:12px;">
+                <button class="btn btn-danger" onclick="leaveCurrentGroup()">Leave Group</button>
+                <button class="btn btn-danger admin-only hidden" id="btn-delete-group" onclick="deleteCurrentGroup()">Delete Group</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Download Password Modal -->
+<div id="modal-password" class="modal-overlay hidden" onclick="closeModalOverlay(event, 'modal-password')">
+    <div class="modal glass-card">
+        <div class="modal-header">
+            <h3>🔒 Password Required</h3>
+            <button class="modal-close" onclick="closeModal('modal-password')">✕</button>
+        </div>
+        <div class="modal-body">
+            <p class="text-muted" style="margin-bottom:16px;">This file is password-protected. Enter password to download.</p>
+            <div class="form-group">
+                <input type="password" id="dl-password-input" class="form-input" placeholder="Enter password..." autocomplete="off">
+                <div id="dl-password-error" class="form-error hidden">Incorrect password. Try again.</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-password')">Cancel</button>
+            <button class="btn btn-primary" id="dl-confirm-btn" onclick="confirmPasswordDownload()">Download</button>
+        </div>
+    </div>
+</div>
+
+<!-- Admin Control Panel Modal -->
+<div id="modal-admin" class="modal-overlay hidden" onclick="closeModalOverlay(event, 'modal-admin')">
+    <div class="modal glass-card modal-wide">
+        <div class="modal-header">
+            <h3>⚙️ Admin Control Panel</h3>
+            <button class="modal-close" onclick="closeModal('modal-admin')">✕</button>
+        </div>
+        <div class="modal-body">
+
+            <!-- System Announcement -->
+            <div class="admin-section">
+                <h4 class="admin-section-title">System Announcement Banner</h4>
+                <div class="form-group" style="display:flex;gap:8px;">
+                    <input type="text" id="admin-announcement-input" class="form-input" placeholder="Broadcast message to all users...">
+                    <button class="btn btn-primary" onclick="postAnnouncement()">Broadcast</button>
+                </div>
+            </div>
+
+            <!-- Server Settings -->
+            <div class="admin-section">
+                <h4 class="admin-section-title">Network Settings</h4>
+                <div class="admin-row">
+                    <div>
+                        <div class="fw-500">Network Mode</div>
+                        <div class="text-muted text-sm">Public: Instant join. Private: Admin approval required.</div>
+                    </div>
+                    <div class="toggle-group">
+                        <button class="toggle-option active" id="mode-public" onclick="setNetworkMode('public')">Public</button>
+                        <button class="toggle-option" id="mode-private" onclick="setNetworkMode('private')">Private</button>
+                    </div>
+                </div>
+                <div class="admin-row">
+                    <div>
+                        <div class="fw-500">Global Chat</div>
+                        <div class="text-muted text-sm">Enable/disable global broadcast channel</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-group-chat" onchange="toggleConfig('groupChatEnabled', this.checked)">
+                        <span class="switch-thumb"></span>
+                    </label>
+                </div>
+                <div class="admin-row">
+                    <div>
+                        <div class="fw-500">File Sharing</div>
+                        <div class="text-muted text-sm">Enable/disable file uploads across network</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-file-sharing" onchange="toggleConfig('fileSharingEnabled', this.checked)">
+                        <span class="switch-thumb"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Storage & Disk Usage -->
+            <div class="admin-section">
+                <h4 class="admin-section-title">Storage & Disk Usage</h4>
+                <div class="admin-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+                    <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+                        <span>Total Uploaded Files:</span>
+                        <strong id="disk-total-val">Calculating...</strong>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="disk-progress-fill" style="width:0%;"></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:0.75rem;" class="text-muted">
+                        <span id="disk-chat-val">Chat: 0 MB</span>
+                        <span id="disk-pool-val">Pool: 0 MB</span>
+                        <span id="disk-profile-val">Profiles: 0 MB</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pending Users -->
+            <div class="admin-section" id="admin-pending-section">
+                <h4 class="admin-section-title">Pending Approval <span id="pending-count-badge" class="count-badge">0</span></h4>
+                <div id="admin-pending-list">
+                    <div class="text-muted text-sm">No pending requests</div>
+                </div>
+            </div>
+
+            <!-- Active User Management (Kick, Password Reset, Block IP) -->
+            <div class="admin-section">
+                <h4 class="admin-section-title">User Management</h4>
+                <div id="admin-users-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Admin Password Reset Modal -->
+<div id="modal-admin-reset-pass" class="modal-overlay hidden" onclick="closeModalOverlay(event, 'modal-admin-reset-pass')">
+    <div class="modal glass-card">
+        <div class="modal-header">
+            <h3>🔑 Reset User Password</h3>
+            <button class="modal-close" onclick="closeModal('modal-admin-reset-pass')">✕</button>
+        </div>
+        <div class="modal-body">
+            <p class="text-muted text-sm" style="margin-bottom:12px;">Reset password for <strong id="reset-target-name">User</strong>. This will force them to re-login.</p>
+            <div class="form-group">
+                <label class="form-label">NEW PASSWORD</label>
+                <input type="password" id="admin-new-pass-input" class="form-input" placeholder="Enter new password (min 4 chars)">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-admin-reset-pass')">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmAdminPasswordReset()">Save New Password</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container" class="toast-container"></div>
+
+<script src="client.js"></script>
+</body>
+</html>

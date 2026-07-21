@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Regnis Server - Host Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <div class="holo-grid"></div>
+
+    <div class="container animate-fade-in">
+        <header class="admin-header glass">
+            <div class="logo">
+                <span class="logo-icon">▲</span>
+                <div>
+                    <h1 class="brand">REGNIS ADMIN PANEL</h1>
+                    <p class="tagline">SUBNET SHIELD & FILE ARRAY CONTROLS</p>
+                </div>
+            </div>
+            <div class="server-status-area">
+                <div class="indicator-group">
+                    <span id="server-dot" class="dot offline"></span>
+                    <span id="server-text" class="status-label">OFFLINE</span>
+                </div>
+                <div class="ip-display" id="host-ips-banner">Detecting network interfaces...</div>
+            </div>
+        </header>
+
+        <!-- DASHBOARD BODY GRID -->
+        <div class="admin-grid">
+
+            <!-- LEFT AREA: CONTROLS & STATISTICS -->
+            <div class="grid-col-1">
+                <!-- System Config Control Card -->
+                <div class="card glass">
+                    <h3 class="card-title">ROUTING CONTROLS</h3>
+
+                    <div class="control-row">
+                        <div class="control-info">
+                            <span class="control-label">Group Chat Array</span>
+                            <span class="control-desc">Toggles network broadcast chat functionality.</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="toggle-chat-btn" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="control-row">
+                        <div class="control-info">
+                            <span class="control-label">File Sharing Router</span>
+                            <span class="control-desc">Disables or enables incoming file writes.</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="toggle-files-btn" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Server Statistics Card -->
+                <div class="card glass">
+                    <h3 class="card-title">METRIC METERS</h3>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <span class="stat-value" id="count-users">0</span>
+                            <span class="stat-label">ONLINE NODES</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-value" id="count-messages">0</span>
+                            <span class="stat-label">CHANNELS IN USE</span>
+                        </div>
+                        <div class="stat-box text-danger">
+                            <span class="stat-value" id="count-blocked">0</span>
+                            <span class="stat-label">BLOCKED IPS</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Direct IP Block Manual Form -->
+                <div class="card glass">
+                    <h3 class="card-title">MANUAL IP DISMISSAL</h3>
+                    <div class="form-group">
+                        <label class="cyber-label">TARGET IP ADDRESS</label>
+                        <div class="input-row">
+                            <input type="text" id="manual-block-ip-input" class="cyber-input" placeholder="e.g. 192.168.1.15">
+                            <button id="block-manual-ip-btn" class="cyber-btn-red">BLOCK IP</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT AREA: USERS & TELEMETRY LISTS -->
+            <div class="grid-col-2">
+                <!-- Users Management Array -->
+                <div class="card glass user-manager-card">
+                    <h3 class="card-title">NODE RECIPIENTS (CLIENTS)</h3>
+                    <div class="table-container">
+                        <table class="cyber-table">
+                            <thead>
+                                <tr>
+                                    <th>NICKNAME</th>
+                                    <th>SUBNET IP</th>
+                                    <th>STATUS</th>
+                                    <th class="text-right">ADMIN CONTROL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No clients detected on host subnet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- System Live Events array log -->
+                <div class="card glass log-card">
+                    <h3 class="card-title">LIVE TELEMETRY STREAM LOGS</h3>
+                    <div id="logs-container" class="telemetry-logs">
+                        <div class="log-entry system">[SYSTEM] Ready to receive telemetry events. Waiting for companion server connection...</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

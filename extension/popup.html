@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Regnis Server Controller</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #04060c;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-hover: rgba(255, 255, 255, 0.06);
+            --primary-grad: linear-gradient(135deg, #7c3aed, #2563eb);
+            --neon-purple: #8b5cf6;
+            --neon-blue: #06b6d4;
+            --online-color: #10b981;
+            --offline-color: #ef4444;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #64748b;
+        }
+        body {
+            width: 320px;
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 16px;
+            overflow: hidden;
+            position: relative;
+        }
+        /* Aesthetic background mesh */
+        body::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            left: -50px;
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, transparent 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+        body::after {
+            content: '';
+            position: absolute;
+            bottom: -50px;
+            right: -50px;
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.15) 0%, transparent 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+        .title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            background: linear-gradient(135deg, #fff, var(--text-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .title span {
+            color: var(--neon-purple);
+            -webkit-text-fill-color: initial;
+        }
+        .status-badge {
+            font-size: 0.65rem;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+        }
+        .status-online {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--online-color);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+        }
+        .status-offline {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--offline-color);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.15);
+        }
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 14px;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: var(--glass-hover);
+        }
+        .card-label {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+        .card-value {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            line-height: 1.4;
+            word-break: break-all;
+        }
+        .card-value strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        .btn-primary {
+            display: block;
+            width: 100%;
+            background: var(--primary-grad);
+            border: none;
+            color: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(124, 58, 237, 0.25);
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+        }
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        .footer {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 16px;
+            border-top: 1px solid var(--glass-border);
+            padding-top: 12px;
+        }
+        .network-ips-list {
+            margin: 4px 0 0 0;
+            padding-left: 16px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            list-style-type: square;
+        }
+        .network-ips-list li {
+            margin-bottom: 2px;
+        }
+        .input-text {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.78rem;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+        .input-text:focus {
+            border-color: var(--neon-purple);
+            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+        }
+        .btn-save {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.72rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-save:hover {
+            background: var(--neon-purple);
+            border-color: var(--neon-purple);
+            color: #fff;
+            box-shadow: 0 0 8px rgba(124, 58, 237, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h3 class="title"><span>▲</span> REGNIS SHIELD</h3>
+        <span id="status-badge" class="status-badge status-offline">OFFLINE</span>
+    </div>
+
+    <div class="card">
+        <div class="card-label">Server Status & Control</div>
+        <div id="status-info" class="card-value">Connecting to local host array...</div>
+    </div>
+
+    <div class="card">
+        <div class="card-label">Active Host LAN IPs</div>
+        <div id="lan-ip-container">
+            <ul id="network-ips" class="network-ips-list">
+                <li>Retrieving...</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-label">Server Config Url</div>
+        <div style="display: flex; gap: 6px; margin-top: 4px;">
+            <input type="text" id="server-url-input" class="input-text" value="http://localhost:8080">
+            <button id="save-server-url-btn" class="btn-save">SAVE</button>
+        </div>
+    </div>
+
+    <button id="launch-admin-btn" class="btn-primary" style="margin-top: 10px;">LAUNCH ADMIN CONSOLE</button>
+
+    <div class="footer">
+        Regnis Portal V1.0.0 • Local Subnet Routing
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
