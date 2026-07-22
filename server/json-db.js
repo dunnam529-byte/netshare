@@ -244,7 +244,7 @@ class JsonStatement {
         }
 
         // Count support
-        if (parsed.selectFields.toLowerCase().includes('count(*)')) {
+        if (/^\s*count\s*\(\*\)/i.test(parsed.selectFields.trim())) {
             const countAlias = parsed.selectFields.match(/as\s+(\w+)/i);
             const key = countAlias ? countAlias[1] : 'count';
             return [{ [key]: rows.length }];
@@ -368,24 +368,66 @@ class JsonDatabase {
         let orderByClause = '';
         let limitVal = null;
 
+        const selectMatch = sql.match(/^\s*SELECT\s+/i);
+        const selectStart = selectMatch ? selectMatch[0].length : 6;
+
         let parenDepth = 0;
         let fromIndex = -1;
+        let fromMatchLen = 0;
         for (let i = 0; i < sql.length; i++) {
             if (sql[i] === '(') parenDepth++;
             else if (sql[i] === ')') parenDepth--;
-            else if (parenDepth === 0 && sql.substring(i, i + 6).toUpperCase() === ' FROM ') {
-                fromIndex = i;
-                break;
+            else if (parenDepth === 0) {
+                const match = sql.substring(i).match(/^(\s+FROM\s+)/i);
+                if (match) {
+                    fromIndex = i;
+                    fromMatchLen = match[0].length;
+                    break;
+                }
             }
         }
 
         if (fromIndex !== -1) {
-            selectFields = sql.substring(6, fromIndex).trim();
-            let rest = sql.substring(fromIndex + 6).trim();
+            selectFields = sql.substring(selectStart, fromIndex).trim();
+            const rest = sql.substring(fromIndex + fromMatchLen).trim();
 
-            let whereIndex = rest.toUpperCase().indexOf(' WHERE ');
-            let orderByIndex = rest.toUpperCase().indexOf(' ORDER BY ');
-            let limitIndex = rest.toUpperCase().indexOf(' LIMIT ');
+            function findKeywordDepth0(str, keywordRegex) {
+                let depth = 0;
+                for (let j = 0; j < str.length; j++) {
+                    if (str[j] === '(') depth++;
+                    else if (str[j] === ')') depth--;
+                    else if (depth === 0) {
+                        const m = str.substring(j).match(keywordRegex);
+                        if (m) {
+                            return { index: j, matchLen: m[0].length };
+                        }
+                    }
+                }
+                return null;
+            }
+
+            let whereIndex = -1;
+            let whereMatchLen = 0;
+            let orderByIndex = -1;
+            let orderByMatchLen = 0;
+            let limitIndex = -1;
+            let limitMatchLen = 0;
+
+            const wMatch = findKeywordDepth0(rest, /^(\s+WHERE\s+)/i);
+            if (wMatch) {
+                whereIndex = wMatch.index;
+                whereMatchLen = wMatch.matchLen;
+            }
+            const oMatch = findKeywordDepth0(rest, /^(\s+ORDER\s+BY\s+)/i);
+            if (oMatch) {
+                orderByIndex = oMatch.index;
+                orderByMatchLen = oMatch.matchLen;
+            }
+            const lMatch = findKeywordDepth0(rest, /^(\s+LIMIT\s+)/i);
+            if (lMatch) {
+                limitIndex = lMatch.index;
+                limitMatchLen = lMatch.matchLen;
+            }
 
             let tableEnd = rest.length;
             if (whereIndex !== -1) tableEnd = Math.min(tableEnd, whereIndex);
@@ -393,26 +435,20 @@ class JsonDatabase {
             if (limitIndex !== -1) tableEnd = Math.min(tableEnd, limitIndex);
 
             fromTableAndAlias = rest.substring(0, tableEnd).trim();
-            let queryRest = rest.substring(tableEnd).trim();
 
-            let upperRest = queryRest.toUpperCase();
-            let wIdx = upperRest.indexOf('WHERE ');
-            let oIdx = upperRest.indexOf('ORDER BY ');
-            let lIdx = upperRest.indexOf('LIMIT ');
-
-            if (wIdx !== -1) {
-                let end = queryRest.length;
-                if (oIdx !== -1 && oIdx > wIdx) end = Math.min(end, oIdx);
-                if (lIdx !== -1 && lIdx > wIdx) end = Math.min(end, lIdx);
-                whereClause = queryRest.substring(wIdx + 6, end).trim();
+            if (whereIndex !== -1) {
+                let whereEnd = rest.length;
+                if (orderByIndex !== -1 && orderByIndex > whereIndex) whereEnd = Math.min(whereEnd, orderByIndex);
+                if (limitIndex !== -1 && limitIndex > whereIndex) whereEnd = Math.min(whereEnd, limitIndex);
+                whereClause = rest.substring(whereIndex + whereMatchLen, whereEnd).trim();
             }
-            if (oIdx !== -1) {
-                let end = queryRest.length;
-                if (lIdx !== -1 && lIdx > oIdx) end = Math.min(end, lIdx);
-                orderByClause = queryRest.substring(oIdx + 9, end).trim();
+            if (orderByIndex !== -1) {
+                let orderByEnd = rest.length;
+                if (limitIndex !== -1 && limitIndex > orderByIndex) orderByEnd = Math.min(orderByEnd, limitIndex);
+                orderByClause = rest.substring(orderByIndex + orderByMatchLen, orderByEnd).trim();
             }
-            if (lIdx !== -1) {
-                limitVal = parseInt(queryRest.substring(lIdx + 6).trim(), 10);
+            if (limitIndex !== -1) {
+                limitVal = parseInt(rest.substring(limitIndex + limitMatchLen).trim(), 10);
             }
         }
         return { selectFields, fromTableAndAlias, whereClause, orderByClause, limitVal };

@@ -39,8 +39,25 @@ function debugLog(prefix, message, extra = null) {
     }
 }
 
+// ── Base Directory Selection ──────────────────────────────────
+let baseDir = __dirname;
+try {
+    const testFile = path.join(__dirname, '.write_test_tmp_' + Date.now());
+    fs.writeFileSync(testFile, 'test');
+    fs.unlinkSync(testFile);
+} catch (e) {
+    baseDir = path.join(os.tmpdir(), 'regnis_v2_fallback');
+    try {
+        if (!fs.existsSync(baseDir)) {
+            fs.mkdirSync(baseDir, { recursive: true });
+        }
+    } catch (err) {
+        baseDir = os.tmpdir();
+    }
+}
+
 // ── Upload Directories ────────────────────────────────────────
-const uploadsDir    = path.join(__dirname, 'uploads');
+const uploadsDir    = path.join(baseDir, 'uploads');
 const chatDir       = path.join(uploadsDir, 'chat');
 const poolDir       = path.join(uploadsDir, 'pool');
 const profilesDir   = path.join(uploadsDir, 'profiles');
@@ -49,7 +66,7 @@ const profilesDir   = path.join(uploadsDir, 'profiles');
 });
 
 // ── SQLite Database Setup ─────────────────────────────────────
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'regnis.db');
+const DB_PATH = process.env.DB_PATH || path.join(baseDir, 'regnis.db');
 let db;
 if (DatabaseSync) {
     try {
