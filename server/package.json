@@ -4,8 +4,8 @@
   "description": "Regnis V2 - Full-Featured Local Network Chat & File Sharing",
   "main": "server.js",
   "scripts": {
-    "start": "node --experimental-sqlite server.js",
-    "dev": "node --experimental-sqlite server.js",
+    "start": "node server.js",
+    "dev": "node server.js",
     "test": "set NODE_OPTIONS=--experimental-sqlite && node_modules\\.bin\\mocha tests/server.test.js --timeout 15000 --reporter spec --exit"
   },
   "dependencies": {

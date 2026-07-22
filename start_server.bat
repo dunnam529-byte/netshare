@@ -26,8 +26,15 @@ if %ERRORLEVEL% neq 0 (
     echo [OK] All packages are successfully installed.
 )
 
-:: Set Node flags for node:sqlite
-set NODE_OPTIONS=--experimental-sqlite
+:: Set Node flags for node:sqlite if supported
+node --experimental-sqlite -e "process.exit(0)" >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    echo [OK] Node.js supports --experimental-sqlite.
+    set NODE_OPTIONS=--experimental-sqlite
+) else (
+    echo [INFO] Node.js does not support --experimental-sqlite. Falling back to standard mode.
+    set NODE_OPTIONS=
+)
 
 echo Current Directory: %CD%
 echo Starting Regnis Server...
