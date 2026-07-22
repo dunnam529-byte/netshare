@@ -1570,6 +1570,7 @@ function broadcastUserList() {
 }
 
 function broadcastToChannel(recipient, recipientType, senderUid, payload, includeSelf = true) {
+    const raw = JSON.stringify(payload);
     if (recipientType === 'global') {
         for (const s of sessions.values()) {
             if (includeSelf || s.uid !== senderUid) {
@@ -1578,8 +1579,15 @@ function broadcastToChannel(recipient, recipientType, senderUid, payload, includ
         }
     } else if (recipientType === 'user') {
         sendToUser(recipient, payload);
-        if (includeSelf) sendToUser(senderUid, payload);
-        broadcastToAdmins(payload);
+        if (includeSelf && senderUid !== recipient) {
+            sendToUser(senderUid, payload);
+        }
+        // Broadcast to admins, but do not send duplicate payloads to sender or recipient who already got it
+        for (const s of sessions.values()) {
+            if (s.isAdmin && s.uid !== recipient && s.uid !== senderUid && s.ws.readyState === WebSocket.OPEN) {
+                s.ws.send(raw);
+            }
+        }
     } else if (recipientType === 'group') {
         const members = db.prepare('SELECT uid FROM group_members WHERE group_id = ?').all(recipient);
         members.forEach(m => {

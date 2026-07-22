@@ -535,6 +535,12 @@ async function handleWSMessage(data) {
             const msg = data.message;
             const key = getMsgChannelKey(msg);
             if (!state.messages[key]) state.messages[key] = [];
+
+            // Prevent duplicate message processing
+            if (state.messages[key].some(m => m.id === msg.id)) {
+                break;
+            }
+
             state.messages[key].push(msg);
 
             const isCurrentChannel = isMsgForCurrentChannel(msg);
@@ -622,6 +628,12 @@ async function handleWSMessage(data) {
             const file = data.file;
             const key = getMsgChannelKey(file);
             if (!state.chatFiles[key]) state.chatFiles[key] = [];
+
+            // Prevent duplicate file message processing
+            if (state.chatFiles[key].some(f => f.id === file.id)) {
+                break;
+            }
+
             state.chatFiles[key].push(file);
 
             const isCurrentChannel = isMsgForCurrentChannel(file);

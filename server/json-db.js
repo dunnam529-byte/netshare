@@ -3,6 +3,97 @@
 const fs = require('fs');
 const path = require('path');
 
+function parseValuesClause(str) {
+    const rows = [];
+    let i = 0;
+    while (i < str.length) {
+        // Find next '('
+        while (i < str.length && str[i] !== '(') {
+            i++;
+        }
+        if (i >= str.length) break;
+        i++; // skip '('
+
+        // Parse list of values inside this parenthesized group
+        const rowValues = [];
+        while (i < str.length && str[i] !== ')') {
+            // skip spaces
+            while (i < str.length && /\s/.test(str[i])) {
+                i++;
+            }
+            if (i >= str.length || str[i] === ')') break;
+
+            // parse value
+            if (str[i] === "'") {
+                // single-quoted string
+                let val = '';
+                i++; // skip quote
+                while (i < str.length && str[i] !== "'") {
+                    if (str[i] === '\\') {
+                        val += str[i + 1] || '';
+                        i += 2;
+                    } else {
+                        val += str[i];
+                        i++;
+                    }
+                }
+                i++; // skip closing quote
+                rowValues.push(val);
+            } else if (str[i] === '"') {
+                // double-quoted string
+                let val = '';
+                i++; // skip quote
+                while (i < str.length && str[i] !== '"') {
+                    if (str[i] === '\\') {
+                        val += str[i + 1] || '';
+                        i += 2;
+                    } else {
+                        val += str[i];
+                        i++;
+                    }
+                }
+                i++; // skip closing quote
+                rowValues.push(val);
+            } else if (str[i] === '?') {
+                rowValues.push('?');
+                i++;
+            } else {
+                // number or unquoted word
+                let val = '';
+                while (i < str.length && str[i] !== ',' && str[i] !== ')' && !/\s/.test(str[i])) {
+                    val += str[i];
+                    i++;
+                }
+                val = val.trim();
+                if (/^\d+$/.test(val)) {
+                    rowValues.push(parseInt(val, 10));
+                } else if (val.toUpperCase() === 'NULL') {
+                    rowValues.push(null);
+                } else if (val.toUpperCase() === 'TRUE') {
+                    rowValues.push(true);
+                } else if (val.toUpperCase() === 'FALSE') {
+                    rowValues.push(false);
+                } else {
+                    rowValues.push(val);
+                }
+            }
+
+            // skip spaces and comma
+            while (i < str.length && /\s/.test(str[i])) {
+                i++;
+            }
+            if (str[i] === ',') {
+                i++;
+            }
+        }
+        if (i < str.length && str[i] === ')') {
+            i++; // skip ')'
+        }
+        rows.push(rowValues);
+    }
+    return rows;
+}
+
 class JsonStatement {
     constructor(db, sql) {
         this.db = db;
@@ -18,66 +109,14 @@ class JsonStatement {
         const sql = this.sql;
 
         // 1. INSERT OR IGNORE / INSERT OR REPLACE / INSERT INTO
-        const insertRegex = /^\s*INSERT\s+(?:OR\s+(IGNORE|REPLACE)\s+)?INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/i;
-        let m = sql.match(insertRegex);
-        if (m) {
-            const mode = m[1] ? m[1].toUpperCase() : null;
-            const table = m[2];
-            const columns = m[3].split(',').map(c => c.trim());
-            const valuesPart = m[4].split(',').map(v => v.trim());
-
-            this.db.initTable(table);
-
-            const row = {};
-            let pIdx = 0;
-            columns.forEach((col, idx) => {
-                const valExpr = valuesPart[idx];
-                if (valExpr === '?') {
-                    row[col] = params[pIdx++];
-                } else if (valExpr.startsWith("'") && valExpr.endsWith("'")) {
-                    row[col] = valExpr.slice(1, -1);
-                } else if (/^\d+$/.test(valExpr)) {
-                    row[col] = parseInt(valExpr, 10);
-                } else {
-                    row[col] = valExpr;
-                }
-            });
-
-            // If there is a primary key or unique field, check uniqueness/replacing
-            let existingIdx = -1;
-            if (table === 'users') {
-                existingIdx = this.db.tables[table].findIndex(r => r.uid === row.uid || r.nickname === row.nickname);
-            } else if (table === 'pending_users') {
-                existingIdx = this.db.tables[table].findIndex(r => r.uid === row.uid || r.nickname === row.nickname);
-            } else if (table === 'group_members') {
-                existingIdx = this.db.tables[table].findIndex(r => r.group_id === row.group_id && r.uid === row.uid);
-            } else if (table === 'read_receipts') {
-                existingIdx = this.db.tables[table].findIndex(r => r.channel_key === row.channel_key && r.uid === row.uid);
-            } else if (table === 'server_config') {
-                existingIdx = this.db.tables[table].findIndex(r => r.key === row.key);
-            } else if (row.id) {
-                existingIdx = this.db.tables[table].findIndex(r => r.id === row.id);
-            }
-
-            if (existingIdx !== -1) {
-                if (mode === 'IGNORE') {
-                    return { changes: 0, lastInsertRowid: null };
-                } else {
-                    // Replace
-                    this.db.tables[table][existingIdx] = { ...this.db.tables[table][existingIdx], ...row };
-                    this.db.save();
-                    return { changes: 1, lastInsertRowid: null };
-                }
-            }
-
-            this.db.tables[table].push(row);
-            this.db.save();
-            return { changes: 1, lastInsertRowid: null };
+        const insertRegex = /^\s*INSERT\s+/i;
+        if (insertRegex.test(sql)) {
+            return this.db.executeInsert(sql, params);
         }
 
         // 2. UPDATE table SET col1 = ?, col2 = ? WHERE condition
         const updateRegex = /^\s*UPDATE\s+(\w+)\s+SET\s+(.*?)(?:\s+WHERE\s+(.*))?$/i;
-        m = sql.match(updateRegex);
+        let m = sql.match(updateRegex);
         if (m) {
             const table = m[1];
             const setPart = m[2];
@@ -130,10 +169,10 @@ class JsonStatement {
 
         // 3. DELETE FROM table WHERE condition
         const deleteRegex = /^\s*DELETE\s+FROM\s+(\w+)(?:\s+WHERE\s+(.*))?$/i;
-        m = sql.match(deleteRegex);
-        if (m) {
-            const table = m[1];
-            const wherePart = m[2] || '';
+        let mDelete = sql.match(deleteRegex);
+        if (mDelete) {
+            const table = mDelete[1];
+            const wherePart = mDelete[2] || '';
 
             this.db.initTable(table);
 
@@ -324,6 +363,73 @@ class JsonDatabase {
         }
     }
 
+    executeInsert(sql, params) {
+        const insertRegex = /^\s*INSERT\s+(?:OR\s+(IGNORE|REPLACE)\s+)?INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s+(.*)$/i;
+        let m = sql.match(insertRegex);
+        if (!m) {
+            return { changes: 0, lastInsertRowid: null };
+        }
+
+        const mode = m[1] ? m[1].toUpperCase() : null;
+        const table = m[2];
+        const columns = m[3].split(',').map(c => c.trim());
+        const valuesPart = m[4].trim();
+
+        this.initTable(table);
+
+        const rowsValues = parseValuesClause(valuesPart);
+
+        let pIdx = 0;
+        let changes = 0;
+
+        rowsValues.forEach(rowValues => {
+            const row = {};
+            columns.forEach((col, idx) => {
+                const valExpr = rowValues[idx];
+                if (valExpr === '?') {
+                    row[col] = params[pIdx++];
+                } else {
+                    row[col] = valExpr;
+                }
+            });
+
+            // If there is a primary key or unique field, check uniqueness/replacing
+            let existingIdx = -1;
+            if (table === 'users') {
+                existingIdx = this.tables[table].findIndex(r => r.uid === row.uid || r.nickname === row.nickname);
+            } else if (table === 'pending_users') {
+                existingIdx = this.tables[table].findIndex(r => r.uid === row.uid || r.nickname === row.nickname);
+            } else if (table === 'group_members') {
+                existingIdx = this.tables[table].findIndex(r => r.group_id === row.group_id && r.uid === row.uid);
+            } else if (table === 'read_receipts') {
+                existingIdx = this.tables[table].findIndex(r => r.channel_key === row.channel_key && r.uid === row.uid);
+            } else if (table === 'server_config') {
+                existingIdx = this.tables[table].findIndex(r => r.key === row.key);
+            } else if (row.id) {
+                existingIdx = this.tables[table].findIndex(r => r.id === row.id);
+            }
+
+            if (existingIdx !== -1) {
+                if (mode === 'IGNORE') {
+                    // Do nothing
+                } else {
+                    // Replace
+                    this.tables[table][existingIdx] = { ...this.tables[table][existingIdx], ...row };
+                    changes++;
+                }
+            } else {
+                this.tables[table].push(row);
+                changes++;
+            }
+        });
+
+        if (changes > 0) {
+            this.save();
+        }
+
+        return { changes, lastInsertRowid: null };
+    }
+
     exec(sql) {
         sql = sql.trim();
         // Support bulk/multi-statement SQL exec
@@ -353,6 +459,12 @@ class JsonDatabase {
                 }
             });
             this.save();
+            return;
+        }
+
+        const insertRegex = /^\s*INSERT\s+/i;
+        if (insertRegex.test(sql)) {
+            this.executeInsert(sql, []);
             return;
         }
     }
