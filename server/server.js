@@ -3,7 +3,13 @@
 // =============================================================
 'use strict';
 
-const { DatabaseSync } = require('node:sqlite');
+let DatabaseSync;
+try {
+    DatabaseSync = require('node:sqlite').DatabaseSync;
+} catch (e) {
+    // Falls back to JSON database below
+}
+const { JsonDatabase } = require('./json-db');
 const express    = require('express');
 const http       = require('http');
 const WebSocket  = require('ws');
@@ -44,9 +50,20 @@ const profilesDir   = path.join(uploadsDir, 'profiles');
 
 // ── SQLite Database Setup ─────────────────────────────────────
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'regnis.db');
-const db = new DatabaseSync(DB_PATH);
-db.exec('PRAGMA journal_mode = WAL');
-db.exec('PRAGMA foreign_keys = ON');
+let db;
+if (DatabaseSync) {
+    try {
+        db = new DatabaseSync(DB_PATH);
+        db.exec('PRAGMA journal_mode = WAL');
+        db.exec('PRAGMA foreign_keys = ON');
+    } catch (e) {
+        console.warn('[FALLBACK] Failed to initialize SQLite database, using JSON fallback:', e.message);
+        db = new JsonDatabase(DB_PATH);
+    }
+} else {
+    console.log('[FALLBACK] node:sqlite DatabaseSync not supported, using JSON fallback.');
+    db = new JsonDatabase(DB_PATH);
+}
 
 // Core Tables & Migrations
 db.exec(`
